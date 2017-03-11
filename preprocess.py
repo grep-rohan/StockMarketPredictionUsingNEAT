@@ -1,5 +1,5 @@
-"""Contains functions to retrieve original and/or normalized SENSEX and USD/INR exchange rate historical training and
-testing data."""
+"""Contains functions to retrieve, scale, split and visualize SENSEX and USD/INR exchange rate historical data."""
+import os
 import time
 from math import floor
 
@@ -14,25 +14,41 @@ def retrieve(from_date='2003-07-14', to_date='2017-02-19'):
 
     :param from_date: Date from which data is to be retrieved. Format: yyyy-mm-dd, dtype: str
     :param to_date: Date to which data is to be retrieved. Format: yyyy-mm-dd, dtype: str
-    :return: Data as pandas dataframe.
+    :return: Data.
     """
-    # validating dates
-    try:
-        time.strptime(from_date, '%Y-%m-%d')
-        time.strptime(to_date, '%Y-%m-%d')
-    except ValueError:
-        print('Invalid date(s)!\nThe dates should be string and the format should be yyyy-mm-dd\n\n'
-              'Using default values (from_date = 2003-07-14, to_date = 2017-02-19\n')
-        from_date = '2003-07-14'
-        to_date = '2017-02-19'
+    start_time = time.clock()
 
-    print('Retrieving SENSEX and USD/INR exchange rate historical data from quandl')
-    sensex = quandl.get('YAHOO/INDEX_BSESN', authtoken="o7Xx9kF1M67g-DyENmfZ", start_date=from_date, end_date=to_date)
-    exchange = quandl.get('FRED/DEXINUS', authtoken="o7Xx9kF1M67g-DyENmfZ", start_date=from_date, end_date=to_date)
+    data = None
 
-    data = pd.concat([sensex, exchange], axis=1)
-    data.rename(columns={'VALUE': 'Exchange'}, inplace=True)
-    data.dropna(inplace=True)
+    # checking if data stored locally
+    if os.path.isfile('data'):
+        print('Found data locally')
+        data = pd.read_pickle('data')
+
+    else:
+        # validating dates
+        try:
+            time.strptime(from_date, '%Y-%m-%d')
+            time.strptime(to_date, '%Y-%m-%d')
+        except ValueError:
+            print('Invalid date(s)!\nThe dates should be string and the format should be yyyy-mm-dd\n\n'
+                  'Using default values (from_date = 2003-07-14, to_date = 2017-02-19\n')
+            from_date = '2003-07-14'
+            to_date = '2017-02-19'
+
+        print('Retrieving data from quandl')
+
+        sensex = quandl.get('YAHOO/INDEX_BSESN', authtoken="o7Xx9kF1M67g-DyENmfZ", start_date=from_date,
+                            end_date=to_date)
+        exchange = quandl.get('FRED/DEXINUS', authtoken="o7Xx9kF1M67g-DyENmfZ", start_date=from_date, end_date=to_date)
+
+        data = pd.concat([sensex, exchange], axis=1)  # merging both dataframes
+        data.rename(columns={'VALUE': 'Exchange'}, inplace=True)  # renaming exchange column
+        data.fillna(method='pad', inplace=True)  # filling missing values with previous values
+
+        data.to_pickle('data')  # storing dataframe in file
+
+    print('Data retrieved in ', time.clock() - start_time, 's')
 
     return data
 
@@ -41,26 +57,25 @@ def scale(data):
     """
     Scale the data between 0 and 1.
 
-    :return: Scaled data as pandas dataframe.
+    :return: Scaled data.
     """
-
     print('Scaling data')
-    data_norm = (data - data.min()) / (data.max() - data.min())
 
-    return data_norm
+    data_scaled = (data - data.min()) / (data.max() - data.min())
+
+    return data_scaled
 
 
-def split(data, train=.9):
+def split(data, train_percent=.9):
     """
     Split data into training and testing data.
 
     :param data: The data to be split.
-    :param train: Percentage of data which is training.
+    :param train_percent: Percentage of data which is training.
     :return: Tuple containing training and testing data.
     """
-
-    train_data = data.iloc[0:floor(train * len(data))]
-    test_data = data.iloc[floor(train * len(data)):]
+    train_data = data.iloc[0:floor(train_percent * len(data))]
+    test_data = data.iloc[floor(train_percent * len(data)):]
 
     return train_data, test_data
 
@@ -68,6 +83,7 @@ def split(data, train=.9):
 def visualize(data, style='ggplot', graph_type='line'):
     """
     Visualize data.
+
     :param data: Data to visualize. (Pandas dataframe)
     :param style: matplotlib style. def = 'ggplot'
     :param graph_type: Graph type ('line' or 'area'). def = 'line'
@@ -85,3 +101,18 @@ def visualize(data, style='ggplot', graph_type='line'):
     else:
         print('\nInvalid type!\nUsing line')
         data.plot()
+    plt.show()
+
+
+def descale(data_scaled, data_original):
+    """
+    Descale scaled data.
+
+    :param data_scaled: Scaled data which is to be descaled.
+    :param data_original: Original data before scaling.
+    :return: Descaled data.
+    """
+    data_descaled = data_scaled * (data_original['Close'].max() - data_original['Close'].min()) + \
+                    data_original['Close'].min()
+
+    return data_descaled
