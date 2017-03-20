@@ -8,7 +8,7 @@ import pandas as pd
 import quandl
 
 
-def retrieve(from_date='2003-07-14', to_date='2017-02-19'):
+def retrieve(from_date='2003-07-14', to_date='2016-12-31'):
     """
     Retrieve BSE SENSEX and USD/INR exchange rate historical data between the two dates passed as arguments.
 
@@ -18,13 +18,10 @@ def retrieve(from_date='2003-07-14', to_date='2017-02-19'):
     """
     start_time = time.clock()
 
-    data = None
-
     # checking if data stored locally
     if os.path.isfile('data'):
-        print('Found data locally')
+        print('Using cached data')
         data = pd.read_pickle('data')
-
     else:
         # validating dates
         try:
@@ -34,7 +31,7 @@ def retrieve(from_date='2003-07-14', to_date='2017-02-19'):
             print('Invalid date(s)!\nThe dates should be string and the format should be yyyy-mm-dd\n\n'
                   'Using default values (from_date = 2003-07-14, to_date = 2017-02-19\n')
             from_date = '2003-07-14'
-            to_date = '2017-02-19'
+            to_date = '2017-03-05'
 
         print('Retrieving data from quandl')
 
@@ -46,24 +43,22 @@ def retrieve(from_date='2003-07-14', to_date='2017-02-19'):
         data.rename(columns={'VALUE': 'Exchange'}, inplace=True)  # renaming exchange column
         data.fillna(method='pad', inplace=True)  # filling missing values with previous values
 
-        data.to_pickle('data')  # storing dataframe in file
+        print('Caching data for future use')
+        data.to_pickle('data')  # caching data for future use
 
-    print('Data retrieved in ', time.clock() - start_time, 's')
+        print('Data retrieved in ', time.clock() - start_time, 's')
 
     return data
 
 
 def scale(data):
     """
-    Scale the data between 0 and 1.
+    Scale the data between -1 and 1.
 
-    :return: Scaled data.
+    :param data: The data to be scaled. Data type : Pandas DataFrame
+    :return: Scaled data. Data Type : Pandas DataFrame
     """
-    print('Scaling data')
-
-    data_scaled = (data - data.min()) / (data.max() - data.min())
-
-    return data_scaled
+    return (data - data.mean()) / (data.max() - data.min())
 
 
 def split(data, train_percent=.9):
