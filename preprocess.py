@@ -35,9 +35,11 @@ def retrieve(from_date='2003-07-14', to_date='2016-12-31'):
 
         print('Retrieving data from quandl')
 
-        sensex = quandl.get('YAHOO/INDEX_BSESN', authtoken="o7Xx9kF1M67g-DyENmfZ", start_date=from_date,
+        api_key = open('quandl_api_key.txt', 'r').read()
+
+        sensex = quandl.get('YAHOO/INDEX_BSESN', authtoken=api_key, start_date=from_date,
                             end_date=to_date)
-        exchange = quandl.get('FRED/DEXINUS', authtoken="o7Xx9kF1M67g-DyENmfZ", start_date=from_date, end_date=to_date)
+        exchange = quandl.get('FRED/DEXINUS', authtoken=api_key, start_date=from_date, end_date=to_date)
 
         data = pd.concat([sensex, exchange], axis=1)  # merging both dataframes
         data.rename(columns={'VALUE': 'Exchange'}, inplace=True)  # renaming exchange column
