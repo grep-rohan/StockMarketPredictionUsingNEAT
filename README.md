@@ -1,1 +1,1 @@
-# StockMarketPredictionUsingNEAT
+# Stock Market Prediction Using NEAT
