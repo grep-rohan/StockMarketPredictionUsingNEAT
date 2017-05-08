@@ -1,51 +1,37 @@
-import datetime as dt
-import time
 import warnings
 
-from pandas import Series, DataFrame
+from pandas import DataFrame, Series
 from sklearn.neural_network import MLPRegressor
 
-import preprocess
+import data_process
 
 warnings.filterwarnings("ignore")
 
-start = time.clock()
-
-attributes = ('Open', 'High', 'Low', 'Close', 'Volume', 'Adjusted Close', 'Exchange')
-days = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri')
-
 if __name__ == '__main__':
-    data = preprocess.retrieve()
-    train, test = preprocess.split(data, train_percent=.6)
-    train = preprocess.scale(train)
-    test = preprocess.scale(test)
-    inputs = [[train.iloc[index][attribute] for attribute in attributes] +
-              [1 if dt.datetime.strptime(str(train.iloc[index].name)[:-9], '%Y-%m-%d').strftime('%a') == day else 0
-               for day in days]
-              for index in range(len(train) - 1)]
-    outputs = [train.iloc[i + 1]['Close'] for i in range(len(train) - 1)]
-    test_inputs = [[test.iloc[index][attribute] for attribute in attributes] +
-                   [1 if dt.datetime.strptime(str(test.iloc[index].name)[:-9], '%Y-%m-%d').strftime('%a') == day else 0
-                    for day in days]
-                   for index in range(len(test) - 1)]
-    test_outputs = [test.iloc[i + 1]['Close'] for i in range(len(test) - 1)]
+    x_train, x_test, y_train, y_test = data_process.preprocess()
 
-    neural_net = MLPRegressor(hidden_layer_sizes=(7,), activation='tanh', solver='adam',
-                              learning_rate='adaptive', max_iter=2000, verbose=True)
-    neural_net.fit(inputs, outputs)
-    preprocess.visualize(Series(neural_net.loss_curve_))
+    neural_net = MLPRegressor(solver='sgd', verbose=True)
+    neural_net.fit(x_train, y_train)
 
-    daily = DataFrame(columns=('Actual Daily', 'Predicted Daily'))
-    count = 0
+    data_process.visualize(Series(neural_net.loss_curve_), graph_type='area')
+
+    print('\nCalculating training results...')
+    training = DataFrame(columns=('Actual', 'Predicted'))
     cost = 0
-    for ip, op in zip(test_inputs, test_outputs):
-        output = neural_net.predict(ip)
-        daily.loc[count] = [op, output[0]]
-        count += 1
-        cost += (output[0] - op) ** 2
+    for index in range(len(y_train)):
+        output = neural_net.predict(x_train[index])
+        training.loc[index] = [y_train[index], output[0]]
+        cost += (y_train[index] - output[0]) ** 2
+    print('\nTraining Cost = %f' % (cost / len(training)))
+    training = data_process.descale(training)
+    data_process.visualize(training)
 
-    print('Test Cost:', -.5 * cost)
-
-    preprocess.visualize(daily)
-
-print(time.clock() - start)
+    print('\nCalculating testing results...')
+    testing = DataFrame(columns=('Actual', 'Predicted'))
+    cost = 0
+    for index in range(len(y_test)):
+        output = neural_net.predict(x_test[index])
+        testing.loc[index] = [y_test[index], output[0]]
+        cost += (y_test[index] - output[0]) ** 2
+    print('\nTesting Cost = %f' % (cost / len(testing)))
+    data_process.visualize(testing)
